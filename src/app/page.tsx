@@ -16,7 +16,6 @@ function formatBytes(bytes: number, decimals = 2) {
 export default async function Home() {
   const logFiles = await getLogFiles();
 
-  // Group logs by appName, then by logType
   const grouped = logFiles.reduce((acc, log) => {
     if (!acc[log.appName]) {
       acc[log.appName] = { out: null, error: null };

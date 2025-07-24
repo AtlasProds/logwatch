@@ -1,95 +1,145 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ParsedLogLine } from '@/lib/log-parser';
-import { format, toZonedTime } from 'date-fns-tz';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 interface LogViewerProps {
   logs: ParsedLogLine[];
-  timezones: string[];
+  logFile: string;
+  totalPages: number;
+  currentPage: number;
+  timezone?: string;
 }
 
-export function LogViewer({ logs, timezones }: LogViewerProps) {
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [selectedTimezone, setSelectedTimezone] = useState<string>(Intl.DateTimeFormat().resolvedOptions().timeZone);
+export function LogViewer({ logs, logFile, totalPages, currentPage, timezone: initialTimezone }: LogViewerProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredAndSortedLogs = useMemo(() => {
-    let filtered = logs;
+  // Timezone logic
+  const commonTimezones = [
+    'local',
+    'UTC',
+    'America/New_York',
+    'Europe/London',
+    'Asia/Kolkata',
+    'Asia/Tokyo',
+    'Australia/Sydney',
+  ];
+  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const urlTimezone = searchParams.get('timezone') || initialTimezone || 'local';
+  const [timezone, setTimezone] = useState(urlTimezone === 'local' ? browserTz : urlTimezone);
 
-    if (startDate) {
-      const start = new Date(startDate);
-      filtered = filtered.filter(log => log.timestamp && log.timestamp >= start);
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      filtered = filtered.filter(log => log.timestamp && log.timestamp <= end);
-    }
+  useEffect(() => {
+    // Sync state with URL param
+    setTimezone(urlTimezone === 'local' ? browserTz : urlTimezone);
+  }, [urlTimezone, browserTz]);
 
-    return filtered.sort((a, b) => {
-      if (!a.timestamp) return 1;
-      if (!b.timestamp) return -1;
-      return sortOrder === 'asc'
-        ? a.timestamp.getTime() - b.timestamp.getTime()
-        : b.timestamp.getTime() - a.timestamp.getTime();
-    });
-  }, [logs, sortOrder, startDate, endDate]);
-
-  const formatTimestamp = (ts: Date | null) => {
-    if (!ts) return 'No Timestamp'.padEnd(25);
-    const zonedTime = toZonedTime(ts, selectedTimezone);
-    return format(zonedTime, 'yyyy-MM-dd HH:mm:ss.SSS zzz', { timeZone: selectedTimezone });
+  const handleTimezoneChange = (tz: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('timezone', tz);
+    router.push(`/logs/${encodeURIComponent(logFile)}?${params.toString()}`);
+    setTimezone(tz);
   };
-  
-  const hasTimestamps = logs.some(log => log.timestamp);
 
-  if (!hasTimestamps) {
-    return (
-      <pre className="whitespace-pre-wrap break-words bg-white dark:bg-gray-800 p-4 rounded-md text-sm">
-        {logs.map((log, i) => (
-          <div key={i}>{log.originalLine}</div>
-        ))}
-      </pre>
-    );
-  }
+  const filteredLogs = useMemo(() => {
+    if (!searchTerm) return logs;
+    return logs.filter(log => log.originalLine.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [logs, searchTerm]);
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', newPage.toString());
+    router.push(`/logs/${encodeURIComponent(logFile)}?${params.toString()}`);
+  };
+
+  const handleDateChange = (type: 'startDate' | 'endDate', value: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (value) {
+      params.set(type, new Date(value).toISOString());
+    } else {
+      params.delete(type);
+    }
+    params.set('page', '1'); // Reset to first page
+    router.push(`/logs/${encodeURIComponent(logFile)}?${params.toString()}`);
+  };
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-md mb-4">
-        <div className="flex items-center gap-2">
-            <label htmlFor="start-date" className="text-sm font-medium">From</label>
-            <Input id="start-date" type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} />
+    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+      <header className="p-4 border-b dark:border-gray-800">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">{logFile}</h1>
+          <div className="flex items-center space-x-2">
+            <Input
+              type="datetime-local"
+              onChange={e => handleDateChange('startDate', e.target.value)}
+              className="bg-white dark:bg-gray-800"
+            />
+            <Input
+              type="datetime-local"
+              onChange={e => handleDateChange('endDate', e.target.value)}
+              className="bg-white dark:bg-gray-800"
+            />
+            <Select value={timezone} onValueChange={handleTimezoneChange}>
+              <SelectTrigger className="w-48 bg-white dark:bg-gray-800">
+                <SelectValue>{timezone === 'local' ? `${browserTz} (Local)` : timezone}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="local">{browserTz} (Local)</SelectItem>
+                {commonTimezones.filter(tz => tz !== 'local').map(tz => (
+                  <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-            <label htmlFor="end-date" className="text-sm font-medium">To</label>
-            <Input id="end-date" type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} />
+        <div className="mt-4">
+          <Input
+            placeholder="Search logs..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full bg-white dark:bg-gray-800"
+          />
         </div>
-        <Select value={selectedTimezone} onValueChange={setSelectedTimezone}>
-            <SelectTrigger className="w-[280px]">
-                <SelectValue placeholder="Select a timezone" />
-            </SelectTrigger>
-            <SelectContent>
-                {timezones.map(tz => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
-            </SelectContent>
-        </Select>
-        <Button onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
-          Sort {sortOrder === 'asc' ? 'Descending' : 'Ascending'}
-        </Button>
-      </div>
-      <pre className="whitespace-pre-wrap break-words bg-white dark:bg-gray-800 p-4 rounded-md text-sm">
-        {filteredAndSortedLogs.map((log, i) => (
-           <div key={i} className="flex">
-             <span className="flex-shrink-0 w-64 text-gray-500 dark:text-gray-400">
-                {formatTimestamp(log.timestamp)}
-             </span>
-             <span className="flex-grow">{log.content || log.originalLine}</span>
-           </div>
+      </header>
+      <main className="flex-1 overflow-y-auto p-4 font-mono text-sm">
+        {filteredLogs.map((log, index) => (
+          <div key={index} className="flex">
+            <div className="w-48 text-gray-500 dark:text-gray-400">
+              {log.timestamp
+                ? log.timestamp.toLocaleString('en-GB', { timeZone: timezone === 'local' ? browserTz : timezone })
+                : '-'}
+            </div>
+            <div className="flex-1 whitespace-pre-wrap">{log.content}</div>
+          </div>
         ))}
-      </pre>
+      </main>
+      <footer className="p-4 border-t dark:border-gray-800">
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Page {currentPage} of {totalPages}
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button onClick={() => handlePageChange(1)} disabled={currentPage === 1} variant="outline" size="icon">
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} variant="outline" size="icon">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} variant="outline" size="icon">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} variant="outline" size="icon">
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </footer>
     </div>
   );
-} 
+}
