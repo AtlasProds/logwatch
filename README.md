@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LogWatch
+
+**LogWatch** is an open-source web application for visualizing and managing PM2 application logs on Unix systems. It provides a modern, intuitive dashboard for monitoring, searching, and analyzing logs across all PM2-managed Node.js applications—no SSH or CLI required.
+
+## Features
+
+### 🔍 Log Discovery & Parsing
+- **Auto-discovers** log files in `~/.pm2/logs/` (active and rotated logs)
+- **Parses** filenames to extract application names and log types (stdout/stderr)
+- **Groups** logs by application and type for easy navigation
+
+### 🖥️ Dashboard Interface
+- **Grid view** of all detected PM2 applications
+- **Status indicators** for active logs (stdout and stderr)
+- **File size display** for each log
+- **Quick access** to log viewer for each log file
+
+### 📖 Log Viewer
+- **View log contents** for any log file (active or rotated)
+- **Sidebar** to switch between rotated and active logs for the same app/type
+- **Timestamp parsing**: Recognizes and displays ISO and bracketed timestamps
+- **Timezone selection**: View timestamps in your preferred timezone
+- **Date range filtering**: Filter logs by start/end date
+- **Sort order**: Toggle ascending/descending by timestamp
+- **Raw view fallback**: Handles logs without timestamps gracefully
+
+### 🛠️ Technical Stack
+
+- **Framework**: Next.js 14+ (App Router, React Server Components)
+- **UI**: Tailwind CSS, custom React components, Radix UI primitives
+- **Icons**: Lucide React
+- **Date/Time**: date-fns, date-fns-tz
+- **File Operations**: Node.js `fs/promises`, `os`, `path`
+- **TypeScript**: End-to-end type safety
 
 ## Getting Started
 
-First, run the development server:
+1. **Install dependencies:**
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+2. **Run the development server:**
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+3. **Open your browser:**  
+   Visit [http://localhost:3000](http://localhost:3000) to access the dashboard.
+
+## Project Structure
+
+```
+logwatch/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx            # Dashboard homepage
+│   │   └── logs/[logFile]/     # Dynamic log viewer pages
+│   ├── components/             # UI components (Card, LogViewer, etc.)
+│   ├── lib/                    # Log discovery and parsing logic
+├── public/                     # Static assets
+├── package.json
+└── README.md
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## How It Works
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Log Discovery:**  
+  On load, LogWatch scans `~/.pm2/logs/` for all log files matching PM2's naming conventions (including rotated logs).
+- **Dashboard:**  
+  Displays a card for each application, with quick links to view stdout and stderr logs.
+- **Log Viewer:**  
+  Lets you browse, filter, and sort log entries. Rotated logs are accessible via a sidebar.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Security
+
+- **Read-only** access to the PM2 logs directory
+- **Path sanitization** to prevent directory traversal
+- **Localhost-only** by default (see deployment for production security)
+
+## Roadmap
+
+- Real-time log streaming (WebSocket)
+- Global search and regex filtering
+- Error highlighting and statistics
+- Multi-pane view for stdout/stderr comparison
+- Authentication for production deployments
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+- [Next.js Documentation](https://nextjs.org/docs)
+- [PM2 Documentation](https://pm2.keymetrics.io/docs/usage/log-management/)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**LogWatch** is in active development. Feedback and contributions are welcome!

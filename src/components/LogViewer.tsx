@@ -45,6 +45,18 @@ export function LogViewer({ logs, timezones }: LogViewerProps) {
     return format(zonedTime, 'yyyy-MM-dd HH:mm:ss.SSS zzz', { timeZone: selectedTimezone });
   };
   
+  const hasTimestamps = logs.some(log => log.timestamp);
+
+  if (!hasTimestamps) {
+    return (
+      <pre className="whitespace-pre-wrap break-words bg-white dark:bg-gray-800 p-4 rounded-md text-sm">
+        {logs.map((log, i) => (
+          <div key={i}>{log.originalLine}</div>
+        ))}
+      </pre>
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-md mb-4">
