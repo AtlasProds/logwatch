@@ -2,6 +2,9 @@
 
 **LogWatch** is an open-source web application for visualizing and managing PM2 application logs on Unix systems. It provides a modern, intuitive dashboard for monitoring, searching, and analyzing logs across all PM2-managed Node.js applications—no SSH or CLI required.
 
+<img width="1828" alt="image" src="https://github.com/user-attachments/assets/d08833ca-dbc5-4962-b0bf-e334aa1a0c01" />
+
+
 ## Setup 
 
 > **Note:** This authentication system relies on secure cookies, which only work if the site is deployed using **HTTPS**. We recommend using Cloudflare Tunnels or Nginx with Certbot to ensure your deployment is secure and supports HTTPS.
