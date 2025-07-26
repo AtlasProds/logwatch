@@ -141,33 +141,38 @@ export async function getInactiveProcessesWithLogs(): Promise<ProcessInfo[]> {
   const activeProcessNames = await getActivePM2Processes();
   const logFiles = await getLogFiles();
   
-  // Get all log files for inactive processes (processes not in active list)
-  const inactiveLogFiles = logFiles.filter(log => !activeProcessNames.includes(log.appName));
+  // Get all unique app names from log files
+  const allAppNamesWithLogs = [...new Set(logFiles.map(log => log.appName))];
   
-  // Group inactive log files by app name
-  const inactiveLogsByApp = inactiveLogFiles.reduce((acc, log) => {
-    if (!acc[log.appName]) {
-      acc[log.appName] = { out: null, error: null };
-    }
-    // For inactive processes, we want to show the most recent log file (active or most recent rotated)
-    if (!log.isRotated) {
-      // Active log file takes priority
-      acc[log.appName][log.logType] = log;
-    } else if (!acc[log.appName][log.logType]) {
-      // If no active log, use the most recent rotated log
-      acc[log.appName][log.logType] = log;
-    } else if (acc[log.appName][log.logType]?.isRotated && log.timestamp && acc[log.appName][log.logType]?.timestamp) {
-      // If both are rotated, use the more recent one
-      if (log.timestamp > acc[log.appName][log.logType]!.timestamp!) {
-        acc[log.appName][log.logType] = log;
+  // Find app names that have logs but are NOT in the active processes list
+  const inactiveAppNames = allAppNamesWithLogs.filter(appName => !activeProcessNames.includes(appName));
+  
+  // Group log files by app name for inactive processes only
+  const inactiveLogsByApp = logFiles
+    .filter(log => inactiveAppNames.includes(log.appName))
+    .reduce((acc, log) => {
+      if (!acc[log.appName]) {
+        acc[log.appName] = { out: null, error: null };
       }
-    }
-    return acc;
-  }, {} as Record<string, { out: LogFile | null; error: LogFile | null }>);
+      
+      // For inactive processes, prioritize active log files over rotated ones
+      if (!log.isRotated) {
+        // Active log file takes priority
+        acc[log.appName][log.logType] = log;
+      } else if (!acc[log.appName][log.logType]) {
+        // If no active log, use this rotated log
+        acc[log.appName][log.logType] = log;
+      } else if (acc[log.appName][log.logType]?.isRotated && log.timestamp && acc[log.appName][log.logType]?.timestamp) {
+        // If both are rotated, use the more recent one
+        if (log.timestamp > acc[log.appName][log.logType]!.timestamp!) {
+          acc[log.appName][log.logType] = log;
+        }
+      }
+      return acc;
+    }, {} as Record<string, { out: LogFile | null; error: LogFile | null }>);
   
   // Create ProcessInfo for all inactive processes that have logs
-  const inactiveProcessNames = Object.keys(inactiveLogsByApp);
-  const processes: ProcessInfo[] = inactiveProcessNames.map(appName => ({
+  const processes: ProcessInfo[] = inactiveAppNames.map(appName => ({
     appName,
     logs: inactiveLogsByApp[appName]
   }));
