@@ -202,7 +202,7 @@ export async function getLogContent(
       });
   }
 
-  const allLines: ParsedLogLine[] = [];
+  let allLines: ParsedLogLine[] = [];
 
   for (const { filePath } of filesToRead) {
     try {
