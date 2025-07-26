@@ -3,6 +3,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { parseLogContent, ParsedLogLine } from './log-parser';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export interface LogFile {
   appName: string;
@@ -14,8 +18,38 @@ export interface LogFile {
   timestamp?: Date;
 }
 
+export interface ProcessInfo {
+  appName: string;
+  logs: {
+    out: LogFile | null;
+    error: LogFile | null;
+  };
+}
+
+interface PM2Process {
+  pid: number;
+  name: string;
+  pm_id: number;
+  monit: {
+    memory: number;
+    cpu: number;
+  };
+}
+
+export async function getActivePM2Processes(): Promise<string[]> {
+  try {
+    const { stdout } = await execAsync('pm2 jlist');
+    const processes: PM2Process[] = JSON.parse(stdout);
+    return processes.map(process => process.name);
+  } catch (error) {
+    console.error('Error executing pm2 jlist:', error);
+    return [];
+  }
+}
+
 export async function getLogFiles(): Promise<LogFile[]> {
   const logDir = path.join(os.homedir(), '.pm2', 'logs');
+  
   try {
     const files = await fs.readdir(logDir);
     const logFiles: LogFile[] = [];
@@ -29,6 +63,7 @@ export async function getLogFiles(): Promise<LogFile[]> {
 
       if (rotatedMatch) {
         const [, appName, logType, timestampStr] = rotatedMatch;
+        
         // Parse timestamp string in format YYYY-MM-DD_HH-mm-ss
         let timestamp: Date | undefined = undefined;
         if (/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/.test(timestampStr)) {
@@ -51,6 +86,7 @@ export async function getLogFiles(): Promise<LogFile[]> {
         });
       } else if (activeMatch) {
         const [, appName, logType] = activeMatch;
+        
         logFiles.push({
           appName,
           logType: logType as 'out' | 'error',
@@ -68,11 +104,36 @@ export async function getLogFiles(): Promise<LogFile[]> {
   }
 }
 
+export async function getActiveProcessesWithLogs(): Promise<ProcessInfo[]> {
+  const activeProcessNames = await getActivePM2Processes();
+  const logFiles = await getLogFiles();
+  
+  // Group log files by app name
+  const logFilesByApp = logFiles.reduce((acc, log) => {
+    if (!acc[log.appName]) {
+      acc[log.appName] = { out: null, error: null };
+    }
+    if (!log.isRotated) {
+      acc[log.appName][log.logType] = log;
+    }
+    return acc;
+  }, {} as Record<string, { out: LogFile | null; error: LogFile | null }>);
+  
+  // Create ProcessInfo for all active processes
+  const processes: ProcessInfo[] = activeProcessNames.map(appName => ({
+    appName,
+    logs: logFilesByApp[appName] || { out: null, error: null }
+  }));
+  
+  return processes;
+}
+
 
 export async function getLogContent(
   logFileName: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  allowInactiveProcesses: boolean = false
 ): Promise<ParsedLogLine[]> {
   const logDir = path.join(os.homedir(), '.pm2', 'logs');
   
@@ -89,6 +150,15 @@ export async function getLogContent(
   } else {
     console.error(`Invalid log file name format: ${logFileName}`);
     return [];
+  }
+
+  // Check if this app is an active PM2 process (only if not allowing inactive processes)
+  if (!allowInactiveProcesses) {
+    const activeProcessNames = await getActivePM2Processes();
+    if (!activeProcessNames.includes(appName)) {
+      console.error(`App ${appName} is not an active PM2 process`);
+      return [];
+    }
   }
 
   const allFilesInDir = await fs.readdir(logDir);
