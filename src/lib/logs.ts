@@ -69,6 +69,7 @@ export async function getLogFiles(): Promise<LogFile[]> {
 
       const rotatedMatch = file.match(/(.+)-(out|error)__(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\.log$/);
       const activeMatch = file.match(/(.+)-(out|error)\.log$/);
+      const processIdMatch = file.match(/(.+)-(out|error)-(\d+)\.log$/);
 
       if (rotatedMatch) {
         const [, appName, logType, timestampStr] = rotatedMatch;
@@ -95,6 +96,17 @@ export async function getLogFiles(): Promise<LogFile[]> {
         });
       } else if (activeMatch) {
         const [, appName, logType] = activeMatch;
+        
+        logFiles.push({
+          appName,
+          logType: logType as 'out' | 'error',
+          filePath,
+          size: stats.size,
+          lastModified: stats.mtime,
+          isRotated: false,
+        });
+      } else if (processIdMatch) {
+        const [, appName, logType] = processIdMatch;
         
         logFiles.push({
           appName,
@@ -203,6 +215,7 @@ export async function getLogContent(
   
   const activeMatch = logFileName.match(/(.+)-(out|error)\.log$/);
   const rotatedMatch = logFileName.match(/(.+)-(out|error)__(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\.log$/);
+  const processIdMatch = logFileName.match(/(.+)-(out|error)-(\d+)\.log$/);
 
   let appName: string;
   let logType: 'out' | 'error';
@@ -211,6 +224,8 @@ export async function getLogContent(
     [, appName, logType] = activeMatch as [string, string, 'out' | 'error'];
   } else if (rotatedMatch) {
     [, appName, logType] = rotatedMatch as [string, string, 'out' | 'error'];
+  } else if (processIdMatch) {
+    [, appName, logType] = processIdMatch as [string, string, 'out' | 'error'];
   } else {
     console.error(`Invalid log file name format: ${logFileName}`);
     return [];
@@ -229,7 +244,7 @@ export async function getLogContent(
   
   const appLogFiles: { filePath: string; timestamp?: Date }[] = [];
   const fileRegex = new RegExp(
-    `^${appName.replace(/[^a-zA-Z0-9-]/g, '\\$&')}-${logType}((__\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2})?)\\.log$`
+    `^${appName.replace(/[^a-zA-Z0-9-]/g, '\\$&')}-${logType}((__\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2})|(-\\d+))?\\.log$`
   );
 
   for (const file of allFilesInDir) {

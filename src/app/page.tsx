@@ -34,7 +34,8 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-      <header className="p-4 border-b dark:border-gray-800">
+      <header className="p-4 border-b dark:border-gray-800 flex items-center">
+        <img src="/logo.png" alt="LogWatch Logo" className="h-12 mr-2" />
         <h1 className="text-2xl font-bold">LogWatch</h1>
       </header>
       <main className="p-4 space-y-8">

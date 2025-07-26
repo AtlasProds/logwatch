@@ -10,19 +10,13 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "LogWatch - PM2 Logs Visualizer",
   description: "An open-source React-based web application for real-time visualization and management of PM2 application logs.",
+  icons: {
+    icon: '/favicon.ico',
+  },
   openGraph: {
     title: "LogWatch - PM2 Logs Visualizer",
     description: "Real-time visualization and management of PM2 application logs on Unix machines.",
-    url: "http://localhost:3001",
     type: "website",
-    images: [
-      {
-        url: "http://localhost:3001/og-image.jpg",
-        width: 800,
-        height: 600,
-        alt: "LogWatch Dashboard",
-      },
-    ],
   },
 };
 
