@@ -142,7 +142,8 @@ export async function getLogContent(
   logFileName: string,
   startDate?: Date,
   endDate?: Date,
-  allowInactiveProcesses: boolean = false
+  allowInactiveProcesses: boolean = false,
+  lazyLoad: boolean = false
 ): Promise<ParsedLogLine[]> {
   const logDir = path.join(os.homedir(), '.pm2', 'logs');
   
@@ -202,9 +203,22 @@ export async function getLogContent(
       });
   }
 
+  // Sort files by timestamp (newest first) for lazy loading
+  filesToRead.sort((a, b) => {
+    if (a.timestamp && b.timestamp) {
+      return b.timestamp.getTime() - a.timestamp.getTime();
+    }
+    if (a.timestamp) return 1;
+    if (b.timestamp) return -1;
+    return 0;
+  });
+
   let allLines: ParsedLogLine[] = [];
 
-  for (const { filePath } of filesToRead) {
+  // If lazy loading and multiple files, only read the most recent file initially
+  const filesToProcess = lazyLoad && filesToRead.length > 1 ? [filesToRead[0]] : filesToRead;
+
+  for (const { filePath } of filesToProcess) {
     try {
       const fileStream = createReadStream(filePath, { encoding: 'utf-8' });
       const rl = readline.createInterface({

@@ -25,7 +25,7 @@ export default async function LogPage({ params, searchParams }: { params: { logF
   const activeProcessNames = await getActivePM2Processes();
   const isInactiveProcess = Boolean(appName && !activeProcessNames.includes(appName));
 
-  const allLogs = await getLogContent(logFile, startDate, endDate, isInactiveProcess);
+  const allLogs = await getLogContent(logFile, startDate, endDate, isInactiveProcess, true);
 
   const logsPerPage = 50;
   const totalPages = Math.ceil(allLogs.length / logsPerPage);

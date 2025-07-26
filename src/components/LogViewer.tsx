@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ParsedLogLine } from '@/lib/log-parser';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,9 @@ export function LogViewer({ logs, logFile, totalPages, currentPage, timezone: in
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
+  const [isRealTime, setIsRealTime] = useState(false);
+  const [realtimeLogs, setRealtimeLogs] = useState<ParsedLogLine[]>([]);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   // Timezone logic
   const commonTimezones = [
@@ -47,10 +50,56 @@ export function LogViewer({ logs, logFile, totalPages, currentPage, timezone: in
     setTimezone(tz);
   };
 
+  const toggleRealTime = useCallback(() => {
+    if (isRealTime) {
+      // Stop real-time watching
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      setIsRealTime(false);
+      setRealtimeLogs([]);
+    } else {
+      // Start real-time watching (only for active log files)
+      const activeMatch = logFile.match(/(.+)-(out|error)\.log$/);
+      if (!activeMatch) {
+        alert('Real-time watching is only available for active log files');
+        return;
+      }
+
+      setIsRealTime(true);
+      setRealtimeLogs([]);
+      
+      const eventSource = new EventSource(`/api/logs/realtime?logFile=${encodeURIComponent(logFile)}`);
+      eventSourceRef.current = eventSource;
+      
+      eventSource.onmessage = (event) => {
+        const newLog: ParsedLogLine = JSON.parse(event.data);
+        setRealtimeLogs(prev => [newLog, ...prev].slice(0, 1000)); // Keep only latest 1000 logs
+      };
+      
+      eventSource.onerror = (error) => {
+        console.error('EventSource error:', error);
+        setIsRealTime(false);
+        eventSource.close();
+      };
+    }
+  }, [isRealTime, logFile]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
+
   const filteredLogs = useMemo(() => {
-    if (!searchTerm) return logs;
-    return logs.filter(log => log.originalLine.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [logs, searchTerm]);
+    const logsToFilter = isRealTime ? realtimeLogs : logs;
+    if (!searchTerm) return logsToFilter;
+    return logsToFilter.filter(log => log.originalLine.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [logs, realtimeLogs, searchTerm, isRealTime]);
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams);
@@ -96,6 +145,18 @@ export function LogViewer({ logs, logFile, totalPages, currentPage, timezone: in
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex items-center space-x-2">
+              <label className="flex items-center space-x-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={isRealTime}
+                  onChange={toggleRealTime}
+                  className="rounded"
+                  disabled={!logFile.match(/(.+)-(out|error)\.log$/)}
+                />
+                <span>Real-time</span>
+              </label>
+            </div>
           </div>
         </div>
         <div className="mt-4">
@@ -122,19 +183,23 @@ export function LogViewer({ logs, logFile, totalPages, currentPage, timezone: in
       <footer className="p-4 border-t dark:border-gray-800">
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            Page {currentPage} of {totalPages}
+            {isRealTime ? (
+              `Real-time (${filteredLogs.length} logs)`
+            ) : (
+              `Page ${currentPage} of ${totalPages}`
+            )}
           </div>
           <div className="flex items-center space-x-2">
-            <Button onClick={() => handlePageChange(1)} disabled={currentPage === 1} variant="outline" size="icon">
+            <Button onClick={() => handlePageChange(1)} disabled={currentPage === 1 || isRealTime} variant="outline" size="icon">
               <ChevronsLeft className="h-4 w-4" />
             </Button>
-            <Button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} variant="outline" size="icon">
+            <Button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1 || isRealTime} variant="outline" size="icon">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} variant="outline" size="icon">
+            <Button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages || isRealTime} variant="outline" size="icon">
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages} variant="outline" size="icon">
+            <Button onClick={() => handlePageChange(totalPages)} disabled={currentPage === totalPages || isRealTime} variant="outline" size="icon">
               <ChevronsRight className="h-4 w-4" />
             </Button>
           </div>
