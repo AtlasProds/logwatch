@@ -25,17 +25,7 @@ export default async function LogPage({ params, searchParams }: { params: { logF
   const activeProcessNames = await getActivePM2Processes();
   const isInactiveProcess = Boolean(appName && !activeProcessNames.includes(appName));
 
-  let allLogs = await getLogContent(logFile, startDate, endDate, isInactiveProcess);
-
-  // Sort logs: latest first
-  allLogs = allLogs.slice().sort((a, b) => {
-    if (a.timestamp && b.timestamp) {
-      return b.timestamp.getTime() - a.timestamp.getTime();
-    }
-    if (a.timestamp) return -1;
-    if (b.timestamp) return 1;
-    return 0;
-  });
+  const allLogs = await getLogContent(logFile, startDate, endDate, isInactiveProcess);
 
   const logsPerPage = 50;
   const totalPages = Math.ceil(allLogs.length / logsPerPage);

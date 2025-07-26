@@ -1,8 +1,10 @@
 
+import { createReadStream } from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { parseLogContent, ParsedLogLine } from './log-parser';
+import readline from 'readline';
+import { parseLogLine, ParsedLogLine } from './log-parser';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -36,11 +38,18 @@ interface PM2Process {
   };
 }
 
+let pm2ProcessesCache: { list: string[]; time: number } | null = null;
+
 export async function getActivePM2Processes(): Promise<string[]> {
+  if (pm2ProcessesCache && Date.now() - pm2ProcessesCache.time < 2000) {
+    return pm2ProcessesCache.list;
+  }
   try {
     const { stdout } = await execAsync('pm2 jlist');
     const processes: PM2Process[] = JSON.parse(stdout);
-    return processes.map(process => process.name);
+    const names = processes.map(process => process.name);
+    pm2ProcessesCache = { list: names, time: Date.now() };
+    return names;
   } catch (error) {
     console.error('Error executing pm2 jlist:', error);
     return [];
@@ -193,17 +202,25 @@ export async function getLogContent(
       });
   }
 
-  let combinedContent = '';
+  const allLines: ParsedLogLine[] = [];
+
   for (const { filePath } of filesToRead) {
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
-      combinedContent += content;
+      const fileStream = createReadStream(filePath, { encoding: 'utf-8' });
+      const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity,
+      });
+
+      for await (const line of rl) {
+        if (line) {
+          allLines.push(parseLogLine(line));
+        }
+      }
     } catch (e) {
       console.error(`Could not read file ${filePath}`, e);
     }
   }
-
-  let allLines = parseLogContent(combinedContent);
 
   if (startDate || endDate) {
     allLines = allLines.filter(line => {
@@ -214,9 +231,10 @@ export async function getLogContent(
     });
   }
 
+  // Sort logs: latest first
   allLines.sort((a, b) => {
     if (a.timestamp && b.timestamp) {
-      return a.timestamp.getTime() - b.timestamp.getTime();
+      return b.timestamp.getTime() - a.timestamp.getTime();
     }
     if (a.timestamp) return -1;
     if (b.timestamp) return 1;

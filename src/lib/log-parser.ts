@@ -22,11 +22,6 @@ const dateFormats = [
     regex: /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2})/,
     format: "yyyy-MM-dd'T'HH:mm:ssXXX",
   },
-   // Format four: 2025-07-24T03:47:24.023Z [INFO]:
-   {
-    regex: /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)/,
-    format: "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-  }
 ];
 
 export function parseLogLine(line: string): ParsedLogLine {
