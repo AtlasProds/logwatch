@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
       const tail = spawn('tail', ['-f', logPath]);
       
       tail.stdout.on('data', (data) => {
-        const lines = data.toString().split('\n').filter(line => line.trim());
+        const lines = data.toString().split('\n').filter((line: string) => line.trim());
         for (const line of lines) {
           const parsedLine = parseLogLine(line);
           controller.enqueue(`data: ${JSON.stringify(parsedLine)}\n\n`);
